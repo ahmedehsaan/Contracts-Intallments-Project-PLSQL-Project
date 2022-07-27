@@ -1,0 +1,26 @@
+create or replace procedure update_installments_no
+is
+cursor contract_cursor is select * from contracts;
+installments_no number(10);
+begin
+for i in contract_cursor loop
+
+if i.contract_payment_type = 'ANNUAL'
+then installments_no := months_between(i.contract_enddate,i.contract_startdate)/12;
+elsif   i.contract_payment_type ='QUARTER'
+then  installments_no := months_between(i.contract_enddate,i.contract_startdate)/3;
+elsif i.contract_payment_type ='MONTHLY'
+then installments_no := months_between(i.contract_enddate,i.contract_startdate);
+elsif  i.contract_payment_type ='HALF_ANNUAL'
+then installments_no := months_between(i.contract_enddate,i.contract_startdate)/6;
+end if;
+
+update contracts 
+set payments_installments_no = installments_no
+where contract_id = i.contract_id;
+end loop;
+end;
+---------------------------------------------------------------
+begin
+update_installments_no;
+end;

@@ -1,0 +1,42 @@
+CREATE OR REPLACE PROCEDURE Fill_Installment_Paid (v_contract_id  number)
+ is
+    cursor paid_cursor is select * from contracts
+    where contract_id = v_contract_id;
+    v_total_fees number(20,2);
+    v_installment_date date;
+    v_amount number(20,2);
+    begin
+    for cur_row in paid_cursor loop
+    if  cur_row.CONTRACT_DEPOSIT_FEES is not null 
+    then v_total_fees := (cur_row.CONTRACT_TOTAL_FEES - cur_row.CONTRACT_DEPOSIT_FEES);
+    else  v_total_fees := cur_row.CONTRACT_TOTAL_FEES;
+    end if;
+    
+    
+    for i in 1..cur_row.PAYMENTS_INSTALLMENTS_NO loop
+   if cur_row.contract_payment_type = 'ANNUAL'
+then v_installment_date := ADD_MONTHS(cur_row.Contract_startdate,12*(i-1)) ;
+elsif   cur_row.contract_payment_type ='QUARTER'
+then  v_installment_date := ADD_MONTHS(cur_row.Contract_startdate,3*(i-1)) ;
+elsif cur_row.contract_payment_type ='MONTHLY'
+then v_installment_date := ADD_MONTHS(cur_row.Contract_startdate,(i-1)) ;
+elsif  cur_row.contract_payment_type ='HALF_ANNUAL'
+then v_installment_date := ADD_MONTHS(cur_row.Contract_startdate,6*(i-1)) ;
+end if;
+
+v_amount :=v_total_fees/cur_row.PAYMENTS_INSTALLMENTS_NO;
+
+INSERT INTO installments_paid(installment_id , contract_id , installment_date , intallment_amount , paid)
+ VALUES (installments_paid_sequence.nextval ,v_contract_id ,v_installment_date,v_amount,0);
+end loop;
+end loop;
+end; 
+-----------------------------------------------------------------------------
+declare
+        cursor id_cursor is
+                select * from contracts ;
+begin
+        for id_record in id_cursor loop
+                Fill_Installment_Paid (id_record.contract_id);
+        end loop;
+end;
