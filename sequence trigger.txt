@@ -1,0 +1,54 @@
+----------> drop triggers and sequences
+declare 
+cursor triggers_cursor is select trigger_name , table_name from user_triggers
+where trigger_name = table_name||'_TRG';
+begin 
+for i in triggers_cursor loop
+execute immediate 'drop trigger '||i.trigger_name;
+end loop;
+
+end;
+
+declare 
+cursor tables_cursor is select distinct table_name from user_tab_columns;
+begin 
+for i in tables_cursor loop
+for j in (select sequence_name from user_sequences
+where sequence_name = i.table_name||'_SEQ') loop
+execute immediate 'drop sequence '||j.sequence_name;
+end loop;
+end loop;
+
+end;
+-----------> create trigger sequence for each table
+DECLARE
+   cursor sequence_cursor is ( select ucc.table_name
+                         , ucc.column_name
+                  from user_constraints uc
+                       join user_cons_columns ucc
+                           on ucc.table_name = uc.table_name
+                          and ucc.constraint_name = uc.constraint_name
+                       join user_tab_columns utc
+                          on utc.table_name = ucc.table_name
+                          and utc.column_name = ucc.column_name
+                  where uc.constraint_type = 'P' 
+                  and   utc.data_type = 'NUMBER' 
+                  );
+max_value number(10);
+ BEGIN
+   FOR rec_cur IN sequence_cursor
+   LOOP
+execute immediate 'select nvl(max(' || rec_cur.column_name || ' ),0)  from ' ||rec_cur.table_name into max_value;
+       EXECUTE IMMEDIATE   'CREATE SEQUENCE '||rec_cur.table_name|| '_SEQ'||
+                                          ' START WITH '||max_value||'
+                                           INCREMENT BY 1 
+                                           MAXVALUE 100000
+                                           MINVALUE 1';
+         EXECUTE IMMEDIATE   'CREATE OR REPLACE TRIGGER '|| rec_cur.table_name|| '_TRG 
+                                            BEFORE INSERT ON '|| rec_cur.table_name||' FOR EACH ROW 
+                                            BEGIN 
+                                            :NEW.'||rec_cur.column_name|| ' := '||rec_cur.table_name||'_SEQ.NEXTVAL;'||
+                                           ' END;' ;
+    END LOOP; 
+end ;
+
